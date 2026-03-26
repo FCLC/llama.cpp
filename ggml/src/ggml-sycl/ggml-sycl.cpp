@@ -671,9 +671,16 @@ static size_t ggml_backend_sycl_buffer_type_get_alignment(ggml_backend_buffer_ty
 }
 
 static size_t ggml_backend_sycl_buffer_type_get_max_size(ggml_backend_buffer_type_t buft) {
-    return dpct::get_current_device().get_max_mem_alloc_size();
+    ggml_backend_sycl_buffer_type_context * ctx = (ggml_backend_sycl_buffer_type_context *) buft->context;
+    size_t max_size = dpct::dev_mgr::instance().get_device(ctx->device).get_max_mem_alloc_size();
 
-    GGML_UNUSED(buft);
+    const char * relaxed_limits = getenv("UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS");
+    if (relaxed_limits == nullptr || strcmp(relaxed_limits, "1") != 0) {
+        constexpr size_t max_size_without_relaxed_limits = 4ull * 1024ull * 1024ull * 1024ull;
+        max_size = std::min(max_size, max_size_without_relaxed_limits);
+    }
+
+    return max_size;
 }
 
 static size_t ggml_backend_sycl_buffer_type_get_alloc_size(ggml_backend_buffer_type_t buft, const ggml_tensor * tensor) {
